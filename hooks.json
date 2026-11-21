@@ -1,0 +1,11 @@
+{
+  "letmeknow": {
+    "PreInvocation": [
+      {
+        "type": "command",
+        "command": "node ./bin/hook.mjs",
+        "timeout": 180
+      }
+    ]
+  }
+}

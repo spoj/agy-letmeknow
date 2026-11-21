@@ -1,0 +1,9 @@
+{
+  "name": "letmeknow",
+  "displayName": "letmeknow",
+  "version": "0.1.0",
+  "description": "Connects Antigravity sessions to letmeknow E2EE agent groups.",
+  "author": "Matthew Wong",
+  "homepage": "https://github.com/spoj/agy-letmeknow",
+  "repository": "https://github.com/spoj/agy-letmeknow"
+}
