@@ -4,8 +4,8 @@ Puts Antigravity CLI sessions in [letmeknow](https://github.com/spoj/letmeknow):
 
 ## Install
 
-1. Link or copy this repository to `~/.gemini/config/plugins/letmeknow`.
-2. Put `bin/cli.mjs` on `PATH` as `agy-letmeknow` (e.g., symlink `~/.local/bin/agy-letmeknow` on Unix, or a `.cmd` shim in `%LOCALAPPDATA%\agy\bin\agy-letmeknow.cmd` on Windows).
+1. Install the plugin: `agy plugin install https://github.com/spoj/agy-letmeknow` (or symlink a local clone to `~/.gemini/config/plugins/letmeknow`).
+2. Put `~/.gemini/config/plugins/letmeknow/bin/cli.mjs` on `PATH` as `agy-letmeknow` (e.g., symlink `~/.local/bin/agy-letmeknow` on Unix/macOS/Termux, or a `.cmd` shim in `%LOCALAPPDATA%\agy\bin\agy-letmeknow.cmd` on Windows).
 3. Configure groups in `~/.gemini/letmeknow.json`:
 
 ```json

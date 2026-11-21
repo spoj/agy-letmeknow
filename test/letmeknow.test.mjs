@@ -8,7 +8,7 @@ import { join } from "node:path";
 import { after, mock, test } from "node:test";
 import { promisify } from "node:util";
 import { capBatch, capLine, installBinary, isAlive, joinListed } from "../bin/daemon.mjs";
-import { isPrintArgs, isSystemTranscript } from "../bin/hook.mjs";
+import { isPrintArgs, isSystemTranscript, tokenizeCmdLine } from "../bin/hook.mjs";
 
 const run = promisify(execFile);
 const target = `${process.platform}-${process.arch}`;
@@ -87,6 +87,8 @@ test("isPrintArgs detects -p/--print/--prompt without matching -i", () => {
   assert.equal(isPrintArgs(["agy", "--prompt", "hi"]), true);
   assert.equal(isPrintArgs(["agy", "-i", "hi"]), false);
   assert.equal(isPrintArgs(["agy", "--conversation", "abc"]), false);
+  assert.equal(isPrintArgs(tokenizeCmdLine('"C:\\Users\\a\\agy.exe" -p "hello world"')), true);
+  assert.equal(isPrintArgs(tokenizeCmdLine('agy "say -p please"')), false);
 });
 
 test("isSystemTranscript distinguishes subagent SYSTEM transcripts from user transcripts", async () => {

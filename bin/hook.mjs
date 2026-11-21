@@ -22,6 +22,10 @@ export function isSystemTranscript(transcriptPath) {
   }
 }
 
+export function tokenizeCmdLine(line) {
+  return line ? (line.match(/"[^"]*"|'[^']*'|\S+/g) ?? []) : [];
+}
+
 export function isPrintArgs(argv) {
   return argv.some(a =>
     a === "-p" || a === "--print" || a === "--prompt" ||
@@ -29,41 +33,55 @@ export function isPrintArgs(argv) {
   );
 }
 
-function isPrintMode(pid) {
-  if (process.platform !== "linux") return false;
-  try {
-    const argv = readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0").filter(Boolean);
-    return isPrintArgs(argv);
-  } catch {
-    return false;
+function isPrintMode(pid, knownCmdLine) {
+  if (knownCmdLine !== undefined) return isPrintArgs(tokenizeCmdLine(knownCmdLine));
+  if (process.platform === "linux" || process.platform === "android") {
+    try {
+      const argv = readFileSync(`/proc/${pid}/cmdline`, "utf8").split("\0").filter(Boolean);
+      return isPrintArgs(argv);
+    } catch {
+      return false;
+    }
   }
+  if (process.platform === "darwin") {
+    try {
+      const out = execFileSync("ps", ["-o", "args=", "-p", String(pid)], { encoding: "utf8" }).trim();
+      return isPrintArgs(tokenizeCmdLine(out));
+    } catch {
+      return false;
+    }
+  }
+  return false;
 }
 
-function resolveAgyPid(dir, conversationId) {
+function resolveAgyProcess(dir, conversationId) {
   const ppid = process.ppid;
-  if (process.platform === "linux") {
+  if (process.platform === "linux" || process.platform === "android") {
     try {
       const argv = readFileSync(`/proc/${ppid}/cmdline`, "utf8").split("\0").filter(Boolean);
       const cmd = basename(argv[0] || "");
-      if ((cmd === "sh" || cmd === "dash" || cmd === "bash") && argv[1] === "-c") {
+      if ((cmd === "sh" || cmd === "dash" || cmd === "bash" || cmd === "zsh") && argv[1] === "-c") {
         const stat = readFileSync(`/proc/${ppid}/stat`, "utf8");
         const rest = stat.slice(stat.lastIndexOf(")") + 2).split(" ");
         const gp = Number(rest[1]);
-        if (Number.isInteger(gp) && gp > 1) return gp;
+        if (Number.isInteger(gp) && gp > 1) return { pid: gp };
       }
     } catch {}
-    return ppid;
+    return { pid: ppid };
   }
   if (process.platform === "darwin") {
     try {
       const out = execFileSync("ps", ["-o", "ppid=,args=", "-p", String(ppid)], { encoding: "utf8" }).trim();
       const m = out.match(/^(\d+)\s+(.*)$/);
-      if (m && /^(?:\/bin\/)?(?:sh|dash|bash|zsh)\s+-c\b/.test(m[2])) {
-        const gp = Number(m[1]);
-        if (Number.isInteger(gp) && gp > 1) return gp;
+      if (m) {
+        if (/^(?:\S*\/)?(?:sh|dash|bash|zsh)\s+-c\b/.test(m[2])) {
+          const gp = Number(m[1]);
+          if (Number.isInteger(gp) && gp > 1) return { pid: gp };
+        }
+        return { pid: ppid, cmdLine: m[2] };
       }
     } catch {}
-    return ppid;
+    return { pid: ppid };
   }
   if (process.platform === "win32") {
     if (existsSync(dir)) {
@@ -71,7 +89,9 @@ function resolveAgyPid(dir, conversationId) {
         if (!name.startsWith("run-") || !name.endsWith(".json")) continue;
         try {
           const st = JSON.parse(readFileSync(join(dir, name), "utf8"));
-          if (st.conversationId === conversationId && isAlive(st.daemonPid) && isAlive(st.agyPid)) return st.agyPid;
+          if (st.conversationId === conversationId && isAlive(st.daemonPid) && isAlive(st.agyPid)) {
+            return { pid: st.agyPid };
+          }
         } catch {}
       }
     }
@@ -82,15 +102,18 @@ function resolveAgyPid(dir, conversationId) {
           "-NoProfile",
           "-NonInteractive",
           "-Command",
-          `$p=Get-CimInstance Win32_Process -Filter 'ProcessId=${ppid}'; if ($p -and $p.Name -match '^cmd(\\.exe)?$') { $p.ParentProcessId } else { ${ppid} }`,
+          `$p=Get-CimInstance Win32_Process -Filter 'ProcessId=${ppid}'; if ($p -and $p.Name -match '^(cmd|powershell|pwsh)(\\.exe)?$') { $p=Get-CimInstance Win32_Process -Filter "ProcessId=$($p.ParentProcessId)" }; if ($p) { "$($p.ProcessId)\`t$($p.CommandLine)" }`,
         ],
         { encoding: "utf8", timeout: 5000 }
       ).trim();
-      const gp = Number(out);
-      if (Number.isInteger(gp) && gp > 0) return gp;
+      const tab = out.indexOf("\t");
+      const gp = Number(tab === -1 ? out : out.slice(0, tab));
+      if (Number.isInteger(gp) && gp > 0) {
+        return { pid: gp, cmdLine: tab === -1 ? undefined : out.slice(tab + 1) };
+      }
     } catch {}
   }
-  return ppid;
+  return { pid: ppid };
 }
 
 async function readStdin() {
@@ -114,8 +137,7 @@ export async function runHook(input) {
   if (!input.lastUserInput && isSystemTranscript(input.transcriptPath)) return {};
 
   const dir = stateDir();
-  const agyPid = resolveAgyPid(dir, input.conversationId);
-  if (!process.env.AGY_LETMEKNOW_JOIN && isPrintMode(agyPid)) return {};
+  const { pid: agyPid, cmdLine } = resolveAgyProcess(dir, input.conversationId);
 
   const runPath = join(dir, `run-${agyPid}.json`);
   const errPath = join(dir, `err-${agyPid}.txt`);
@@ -124,6 +146,7 @@ export async function runHook(input) {
   if (state && isAlive(state.daemonPid)) {
     if (state.conversationId !== input.conversationId) return {};
   } else {
+    if (!process.env.AGY_LETMEKNOW_JOIN && isPrintMode(agyPid, cmdLine)) return {};
     rmSync(runPath, { force: true });
     rmSync(errPath, { force: true });
     const daemonPath = join(import.meta.dirname, "daemon.mjs");
