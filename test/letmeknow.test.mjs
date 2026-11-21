@@ -337,7 +337,12 @@ globalThis.fetch = async (url, opts) => {
   d1.unref();
 
   const runFile1 = join(home, ".local", "state", "agy-letmeknow", `run-${parent1.pid}.json`);
-  const state1 = await waitFor(async () => existsSync(runFile1) && JSON.parse(await readFile(runFile1, "utf8")));
+  const receipt = await waitFor(async () => existsSync(readyFile) && JSON.parse(await readFile(readyFile, "utf8")));
+  const state1 = await waitFor(async () => {
+    if (!existsSync(runFile1)) return false;
+    const s = JSON.parse(await readFile(runFile1, "utf8"));
+    return s.groups?.includes("grp_test_1") ? s : false;
+  });
   assert.equal(state1.conversationId, convId);
   assert.equal(state1.agyPid, parent1.pid);
   assert.equal(state1.fp, "aaaaaaaaaaaaaaa1");
@@ -345,7 +350,6 @@ globalThis.fetch = async (url, opts) => {
   assert.equal(state1.bound, false);
 
   // Ready file receipt written with fp, conversationId, groups.
-  const receipt = JSON.parse(await readFile(readyFile, "utf8"));
   assert.equal(receipt.fp, "aaaaaaaaaaaaaaa1");
   assert.equal(receipt.conversationId, convId);
   assert.deepEqual(receipt.groups, ["grp_test_1"]);
@@ -434,7 +438,11 @@ globalThis.fetch = async (url, opts) => {
     });
     d2.unref();
     const runFile2 = join(home, ".local", "state", "agy-letmeknow", `run-${parent2.pid}.json`);
-    const state2 = await waitFor(async () => existsSync(runFile2) && JSON.parse(await readFile(runFile2, "utf8")));
+    const state2 = await waitFor(async () => {
+      if (!existsSync(runFile2)) return false;
+      const s = JSON.parse(await readFile(runFile2, "utf8"));
+      return s.groups?.includes("grp_test_1") ? s : false;
+    });
     assert.equal(state2.fp, "aaaaaaaaaaaaaaa1");
     assert.deepEqual(state2.groups, ["grp_test_1"]);
   } finally {

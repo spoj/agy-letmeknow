@@ -173,7 +173,7 @@ export async function joinListed(executable, fp, groups, signal, env) {
     }
     const siblings = sessions
       .filter(s => s.fp !== fp && s.groups?.includes(group))
-      .sort((a, b) => Number(!!b.running) - Number(!!a.running));
+      .sort((a, b) => (Number(!!b.running) - Number(!!a.running)) || String(b.last_ran ?? "").localeCompare(String(a.last_ran ?? "")));
     const failures = [];
     for (const sibling of siblings) {
       signal.throwIfAborted();
@@ -428,17 +428,6 @@ async function runDaemon(agyPid, conversationId) {
 
     await startWithFallbacks();
     await saveSessionFp(sessionsFile, conversationId, fp);
-
-    let joinError;
-    try {
-      const joined = await joinListed(bin, fp, groups, stop.signal, childEnv);
-      activeGroups = joined.joined;
-      warnings.push(...joined.warnings);
-    } catch (err) {
-      if (shuttingDown) return;
-      joinError = err;
-      warnings.push(`letmeknow: joining groups failed: ${err.message}`);
-    }
     if (shuttingDown) return;
 
     const ipcToken = randomBytes(24).toString("hex");
@@ -512,6 +501,25 @@ async function runDaemon(agyPid, conversationId) {
       promptInjected: false,
       attached,
     });
+
+    let joinError;
+    try {
+      const joined = await joinListed(bin, fp, groups, stop.signal, childEnv);
+      activeGroups = joined.joined;
+      warnings.push(...joined.warnings);
+    } catch (err) {
+      if (shuttingDown) return;
+      joinError = err;
+      warnings.push(`letmeknow: joining groups failed: ${err.message}`);
+    }
+    if (shuttingDown) return;
+
+    if (existsSync(runPath)) {
+      const cur = JSON.parse(await readFile(runPath, "utf8"));
+      cur.groups = activeGroups;
+      cur.warnings = warnings;
+      await writeJsonAtomic(runPath, cur);
+    }
 
     if (joinError) {
       await emitReadyFile({ fp, conversationId, groups: [], warnings, error: joinError.message });

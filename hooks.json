@@ -4,7 +4,7 @@
       {
         "type": "command",
         "command": "node ./bin/hook.mjs",
-        "timeout": 180
+        "timeout": 35
       }
     ]
   }

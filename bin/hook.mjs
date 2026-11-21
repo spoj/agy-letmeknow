@@ -4,7 +4,7 @@ import { basename, join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { isAlive, stateDir, writeJsonAtomic } from "./daemon.mjs";
 
-const START_TIMEOUT_MS = 175_000;
+const START_TIMEOUT_MS = 30_000;
 
 export function isSystemTranscript(transcriptPath) {
   if (!transcriptPath || !existsSync(transcriptPath)) return false;
