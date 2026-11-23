@@ -123,7 +123,7 @@ export async function installBinary(warn = () => {}) {
   try {
     await writeFile(join(tmp, "package.tgz"), bytes);
     // Relative tar args avoid GNU tar on Windows treating `C:` as a remote host.
-    await run("tar", ["-xzf", "package.tgz"], { cwd: tmp });
+    await run("tar", ["-xzf", "package.tgz"], { cwd: tmp, windowsHide: true });
     await access(join(tmp, "package", "bin", EXECUTABLE));
     try {
       await rename(join(tmp, "package"), dest);
@@ -137,13 +137,13 @@ export async function installBinary(warn = () => {}) {
 }
 
 async function lmkJson(executable, args, env, timeout = 0) {
-  return JSON.parse((await run(executable, args, { env, timeout })).stdout);
+  return JSON.parse((await run(executable, args, { env, timeout, windowsHide: true })).stdout);
 }
 
 async function inviteFrom(executable, sibling, group, use, signal, env) {
   const invite = async () => (await lmkJson(executable, ["--session", sibling.fp, "invite", "--group", group], env, INVITE_WAIT)).link;
   if (sibling.running) return void (await use(await invite()));
-  const listen = spawn(executable, ["--session", sibling.fp, "listen"], { stdio: ["ignore", "pipe", "pipe"], signal, env });
+  const listen = spawn(executable, ["--session", sibling.fp, "listen"], { stdio: ["ignore", "pipe", "pipe"], signal, env, windowsHide: true });
   try {
     await new Promise((resolve, reject) => {
       let errors = "";
@@ -308,7 +308,7 @@ async function runDaemon(agyPid, conversationId) {
     const cmd = agyExe && existsSync(agyExe) ? agyExe : "agy";
     const env = { ...childEnv, ANTIGRAVITY_LS_ADDRESS: lsAddress, ANTIGRAVITY_CSRF_TOKEN: csrfToken };
     deliveryChain = deliveryChain
-      .then(() => run(cmd, ["agentapi", "send-message", "--title=letmeknow", conversationId, batch], { env, timeout: 30_000 }))
+      .then(() => run(cmd, ["agentapi", "send-message", "--title=letmeknow", conversationId, batch], { env, timeout: 30_000, windowsHide: true }))
       .catch(() => {});
   };
 
@@ -355,7 +355,7 @@ async function runDaemon(agyPid, conversationId) {
     const savedFp = savedSessions[conversationId]?.fp;
 
     const tryStart = args => new Promise((resolve, reject) => {
-      const child = spawn(executable, args, { stdio: ["ignore", "pipe", "pipe"], env: childEnv });
+      const child = spawn(executable, args, { stdio: ["ignore", "pipe", "pipe"], env: childEnv, windowsHide: true });
       let errors = "";
       let settled = false;
       child.stderr.on("data", chunk => (errors = (errors + chunk).slice(-2000)));

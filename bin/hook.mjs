@@ -104,7 +104,7 @@ function resolveAgyProcess(dir, conversationId) {
           "-Command",
           `$p=Get-CimInstance Win32_Process -Filter 'ProcessId=${ppid}'; if ($p -and $p.Name -match '^(cmd|powershell|pwsh)(\\.exe)?$') { $p=Get-CimInstance Win32_Process -Filter "ProcessId=$($p.ParentProcessId)" }; if ($p) { "$($p.ProcessId)\`t$($p.CommandLine)" }`,
         ],
-        { encoding: "utf8", timeout: 5000 }
+        { encoding: "utf8", timeout: 5000, windowsHide: true }
       ).trim();
       const tab = out.indexOf("\t");
       const gp = Number(tab === -1 ? out : out.slice(0, tab));
@@ -153,6 +153,7 @@ export async function runHook(input) {
     const child = spawn(process.execPath, [daemonPath, String(agyPid), input.conversationId], {
       detached: true,
       stdio: "ignore",
+      windowsHide: true,
       env: process.env,
     });
     let exited = false;
